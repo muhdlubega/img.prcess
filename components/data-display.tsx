@@ -45,23 +45,61 @@ export function DataDisplay({ data, onReset, documentName, onDocumentNameChange 
 
   const handleExportPDF = () => {
     const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const margin = 20
+    const maxWidth = pageWidth - 2 * margin
+    let yPosition = 20
 
-    doc.setFontSize(18)
-    doc.text("Extracted Document Data", 20, 20)
+    const addText = (text: string, fontSize: number, isBold = false) => {
+      doc.setFontSize(fontSize)
+      if (isBold) {
+        doc.setFont("Inter", "bold")
+      } else {
+        doc.setFont("Inter", "normal")
+      }
 
-    doc.setFontSize(14)
-    doc.text(displayName, 20, 30)
+      const lines = doc.splitTextToSize(text, maxWidth)
+      if (yPosition + lines.length * (fontSize * 0.5) > pageHeight - margin) {
+        doc.addPage()
+        yPosition = margin
+      }
 
-    doc.setFontSize(12)
-    let yPosition = 45
+      lines.forEach((line: string) => {
+        doc.text(line, margin, yPosition)
+        yPosition += fontSize * 0.5
+      })
+
+      return yPosition
+    }
+
+    addText("Extracted Document Data", 18, true)
+    yPosition += 5
+
+    addText(displayName, 14, true)
+    yPosition += 10
+
+    addText("Structured Fields:", 12, true)
+    yPosition += 5
 
     Object.entries(data.fields).forEach(([key, value]) => {
-      doc.text(`${formatFieldName(key)}: ${value}`, 20, yPosition)
-      yPosition += 10
+      const fieldText = `${formatFieldName(key)}: ${value}`
+      const confidence = data.confidence?.[key] || 0
+      const confidenceText = ` (${Math.round(confidence)}% confidence)`
+
+      addText(fieldText + confidenceText, 11)
+      yPosition += 3
     })
 
-    doc.setFontSize(10)
-    doc.text(`Processed at: ${data.processedAt}`, 20, yPosition + 10)
+    if (data.rawText && data.rawText.trim()) {
+      yPosition += 10
+      addText("Raw Extracted Text:", 12, true)
+      yPosition += 5
+      addText(data.rawText, 10)
+    }
+
+    yPosition += 10
+    addText(`Processed at: ${data.processedAt}`, 9)
 
     doc.save(`${displayName.replace(/\s+/g, "-")}-${Date.now()}.pdf`)
   }
@@ -81,9 +119,9 @@ export function DataDisplay({ data, onReset, documentName, onDocumentNameChange 
       <Card className="p-6">
         <div className="flex items-start justify-between mb-6">
           <div className="flex-1">
-          <div className="flex items-start gap-4">
-            <h2 className="text-2xl font-bold text-foreground mb-2">Extracted Data</h2>
-            <Button className="cursor-pointer" variant="outline" onClick={onReset}>
+          <div className="flex items-start gap-4 md:flex-row flex-col mb-2">
+            <h2 className="text-2xl font-bold text-foreground">Extracted Data</h2>
+            <Button className="cursor-pointer w-[166px]" variant="outline" onClick={onReset}>
               Process Another
             </Button>
           </div>
