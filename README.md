@@ -38,23 +38,22 @@ Before you begin, ensure you have:
 1. **Clone or download the project**
 
 2. **Install dependencies**
-   \`\`\`bash
+   ```bash
    npm install
-   \`\`\`
+   ```
 
 3. **Set up environment variables**
 
    Create a `.env.local` file in the root directory with the following variables:
 
-   \`\`\`env
+   ```env
    # Supabase Configuration
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
    # Mistral AI Configuration
    MISTRAL_API_KEY=your_mistral_api_key
-   \`\`\`
+   ```
 
    **Where to find these values:**
    - Supabase credentials: Project Settings > API in your Supabase dashboard
@@ -85,19 +84,19 @@ Before you begin, ensure you have:
 ## Running the Application
 
 1. **Development mode**
-   \`\`\`bash
+   ```bash
    npm run dev
-   \`\`\`
+   ```
 
 2. **Open your browser**
    
    Navigate to [http://localhost:3000](http://localhost:3000)
 
 3. **Production build**
-   \`\`\`bash
+   ```bash
    npm run build
    npm start
-   \`\`\`
+   ```
 
 ## Usage Guide
 
@@ -135,7 +134,7 @@ Use the theme toggle in the sidebar to switch between dark mode (default) and li
 
 ## Project Structure
 
-\`\`\`
+```
 ├── app/
 │   ├── api/
 │   │   ├── process-document/    # AI document processing endpoint
@@ -158,7 +157,7 @@ Use the theme toggle in the sidebar to switch between dark mode (default) and li
 └── scripts/
     ├── setup-database.sql        # Initial database schema
     └── migrate-add-missing-columns.sql  # Migration script
-\`\`\`
+```
 
 ## Features in Detail
 
