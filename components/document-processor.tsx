@@ -116,7 +116,7 @@ export function DocumentProcessor({ selectedDocument }: DocumentProcessorProps) 
           <div className={extractedData ? "text-left" : "text-center"}>
             <h1 className="text-4xl font-bold text-foreground mb-3 text-balance"><span className="text-[#5b9385] font-extrabold text-5xl">IMG</span>.prcess</h1>
             <p className="text-muted-foreground text-lg leading-relaxed">
-              Upload document images and extract structured data with AI-powered analysis
+              AI-powered OCR: Upload document images and extract structured data with intelligent analysis
             </p>
           </div>
         </div>

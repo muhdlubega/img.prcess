@@ -5,7 +5,7 @@ import "./globals.css"
 
 export const metadata: Metadata = {
   title: "IMG.prcess",
-  description: "AI-powered document processing and data extraction"
+  description: "AI-powered OCR: Upload document images and extract structured data with intelligent analysis"
 }
 
 export default function RootLayout({
