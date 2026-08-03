@@ -275,7 +275,7 @@ export function Sidebar({ onSelectDocument, isOpen, onToggle }: SidebarProps) {
             <Telescope className="h-3.5 w-3.5" aria-hidden="true" />
             Take a tour
           </Button>
-          <Button variant="outline" size="sm" className="group w-full" onClick={fetchDocuments}>
+          <Button variant="outline" size="sm" className="group w-full" onClick={() => fetchDocuments()}>
             <RefreshCw className="h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-180" aria-hidden="true" />
             Refresh
           </Button>
