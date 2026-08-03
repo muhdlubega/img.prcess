@@ -20,7 +20,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { useTheme } from "@/components/theme-provider"
-import { startWalkthrough } from "@/components/walkthrough-host"
+import {
+  CLOSE_SIDEBAR_EVENT,
+  OPEN_SIDEBAR_EVENT,
+  startWalkthrough,
+} from "@/components/walkthrough-host"
 import { useSelection } from "@/components/selection-provider"
 import { cn, formatDate } from "@/lib/utils"
 import type { ExtractedData } from "@/lib/types"
@@ -79,6 +83,21 @@ export function Sidebar({ onSelectDocument, isOpen, onToggle }: SidebarProps) {
   useEffect(() => {
     if (lastSavedId) setSelectedId(lastSavedId)
   }, [lastSavedId])
+
+  useEffect(() => {
+    const openSidebar = () => {
+      if (!isOpen) onToggle()
+    }
+    const closeSidebar = () => {
+      if (isOpen) onToggle()
+    }
+    window.addEventListener(OPEN_SIDEBAR_EVENT, openSidebar)
+    window.addEventListener(CLOSE_SIDEBAR_EVENT, closeSidebar)
+    return () => {
+      window.removeEventListener(OPEN_SIDEBAR_EVENT, openSidebar)
+      window.removeEventListener(CLOSE_SIDEBAR_EVENT, closeSidebar)
+    }
+  }, [isOpen, onToggle])
 
   const handleSelectDocument = (doc: SavedDocument) => {
     setSelectedId(doc.id)

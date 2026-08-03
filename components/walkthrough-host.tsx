@@ -5,6 +5,8 @@ import { Walkthrough } from "@/components/walkthrough"
 import { usePreferences } from "@/components/preferences-provider"
 
 export const WALKTHROUGH_EVENT = "img-prcess:start-walkthrough"
+export const OPEN_SIDEBAR_EVENT = "img-prcess:open-sidebar"
+export const CLOSE_SIDEBAR_EVENT = "img-prcess:close-sidebar"
 
 export function startWalkthrough() {
   if (typeof window !== "undefined") {
