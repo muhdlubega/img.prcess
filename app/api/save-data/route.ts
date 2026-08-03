@@ -61,10 +61,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const fields = { ...(data.fields || {}) }
+    if (data.analysis && typeof data.analysis === "object") {
+      fields.__analysis = JSON.stringify(data.analysis).slice(0, 50_000)
+    }
+    if (typeof data.question === "string" && data.question.trim()) {
+      fields.__question = data.question.trim().slice(0, 2000)
+    }
+    if (typeof data.documentType === "string") {
+      fields.__document_type = String(data.documentType).slice(0, 32)
+    }
+
     const insertData = {
       user_ip: ip,
       document_name: data.document_name || "Untitled Document",
-      fields: data.fields,
+      fields,
       raw_text: data.rawText || "",
       confidence: data.confidence || {},
       total_accuracy: totalAccuracy,

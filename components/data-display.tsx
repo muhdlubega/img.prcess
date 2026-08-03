@@ -1,15 +1,18 @@
 "use client"
 
+import { useState } from "react"
 import { Button } from "./ui/button"
 import { Card } from "./ui/card"
 import { Progress } from "./ui/progress"
 import { CircularProgress } from "./ui/circular-progress"
-import type { ExtractedData } from "./document-processor"
+import { Input } from "./ui/input"
+import { SimpleChart } from "./simple-chart"
+import type { ExtractedData } from "@/lib/types"
+import { formatDate, formatFieldName } from "@/lib/utils"
+import { usePreferences } from "./preferences-provider"
 import * as XLSX from "xlsx"
 import { jsPDF } from "jspdf"
-import { formatDate, formatFieldName } from "@/lib/utils"
-import { Input } from "./ui/input"
-import { useState } from "react"
+import { Check, ClipboardCopy, FileDown, FileSpreadsheet, RotateCcw } from "lucide-react"
 
 interface DataDisplayProps {
   data: ExtractedData
@@ -20,13 +23,18 @@ interface DataDisplayProps {
 
 export function DataDisplay({ data, onReset, documentName, onDocumentNameChange }: DataDisplayProps) {
   const [copied, setCopied] = useState(false)
-
-  const displayName = documentName || data.document_name || "Untitled Document"
+  const { preferences } = usePreferences()
+  const displayName = documentName || data.document_name || "Untitled analysis"
 
   const totalAccuracy =
     data.confidence && Object.keys(data.confidence).length > 0
       ? Object.values(data.confidence).reduce((sum, val) => sum + val, 0) / Object.values(data.confidence).length
       : 0
+
+  const showStructured =
+    preferences.outputFormat === "structured" || preferences.outputFormat === "both"
+  const showNarrative =
+    preferences.outputFormat === "narrative" || preferences.outputFormat === "both"
 
   const handleExportExcel = () => {
     const formattedData = Object.entries(data.fields).reduce(
@@ -53,182 +61,238 @@ export function DataDisplay({ data, onReset, documentName, onDocumentNameChange 
 
     const addText = (text: string, fontSize: number, isBold = false) => {
       doc.setFontSize(fontSize)
-      if (isBold) {
-        doc.setFont("Inter", "bold")
-      } else {
-        doc.setFont("Inter", "normal")
-      }
-
+      doc.setFont("helvetica", isBold ? "bold" : "normal")
       const lines = doc.splitTextToSize(text, maxWidth)
       if (yPosition + lines.length * (fontSize * 0.5) > pageHeight - margin) {
         doc.addPage()
         yPosition = margin
       }
-
       lines.forEach((line: string) => {
         doc.text(line, margin, yPosition)
         yPosition += fontSize * 0.5
       })
-
       return yPosition
     }
 
-    addText("Extracted Document Data", 18, true)
+    addText("AI Data Analysis", 18, true)
     yPosition += 5
-
     addText(displayName, 14, true)
-    yPosition += 10
+    yPosition += 8
 
-    addText("Structured Fields:", 12, true)
-    yPosition += 5
+    if (data.question) {
+      addText(`Question: ${data.question}`, 11)
+      yPosition += 6
+    }
 
-    Object.entries(data.fields).forEach(([key, value]) => {
-      const fieldText = `${formatFieldName(key)}: ${value}`
-      const confidence = data.confidence?.[key] || 0
-      const confidenceText = ` (${Math.round(confidence)}% confidence)`
+    if (data.analysis?.summary) {
+      addText("Summary", 12, true)
+      yPosition += 4
+      addText(data.analysis.summary, 11)
+      yPosition += 8
+    }
 
-      addText(fieldText + confidenceText, 11)
-      yPosition += 3
-    })
+    if (Object.keys(data.fields).length > 0) {
+      addText("Structured Fields", 12, true)
+      yPosition += 4
+      Object.entries(data.fields).forEach(([key, value]) => {
+        const confidence = data.confidence?.[key]
+        const conf =
+          preferences.includeConfidence && typeof confidence === "number"
+            ? ` (${Math.round(confidence)}%)`
+            : ""
+        addText(`${formatFieldName(key)}: ${value}${conf}`, 11)
+        yPosition += 2
+      })
+    }
 
-    if (data.rawText && data.rawText.trim()) {
-      yPosition += 10
-      addText("Raw Extracted Text:", 12, true)
-      yPosition += 5
+    if (data.rawText?.trim()) {
+      yPosition += 8
+      addText("Raw Text", 12, true)
+      yPosition += 4
       addText(data.rawText, 10)
     }
 
     yPosition += 10
     addText(`Processed at: ${data.processedAt}`, 9)
-
     doc.save(`${displayName.replace(/\s+/g, "-")}-${Date.now()}.pdf`)
   }
 
   const handleCopyRawText = async () => {
     try {
-      await navigator.clipboard.writeText(data.rawText)
+      await navigator.clipboard.writeText(data.rawText || data.analysis?.summary || "")
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error("Failed to copy text:", err)
+    } catch {
+      // clipboard may be unavailable
     }
   }
 
   return (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex-1">
-          <div className="flex items-start gap-4 md:flex-row flex-col mb-2">
-            <h2 className="text-2xl font-bold text-foreground">Extracted Data</h2>
-            <Button className="cursor-pointer w-[166px]" variant="outline" onClick={onReset}>
-              Process Another
+    <div className="space-y-5 animate-page-in" aria-live="polite">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex-1 space-y-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground">Results</h2>
+            <Button variant="outline" size="sm" className="group gap-1.5 hover:-translate-y-0.5" onClick={onReset}>
+              <RotateCcw className="h-3.5 w-3.5" />
+              Start another
             </Button>
           </div>
-            <div className="flex items-center gap-2 mt-2 mb-2">
-              <Input
-                value={displayName}
-                onChange={(e) => onDocumentNameChange(e.target.value)}
-                className="max-w-md bg-card border-none -ml-[12px]"
-                placeholder="Document name"
-              />
-            </div>
-            <p className="text-sm text-muted-foreground">Processed at {formatDate(data.processedAt)}</p>
-          </div>
-          <div className="flex items-start gap-4">
-            <CircularProgress value={totalAccuracy} size={100} strokeWidth={8} />
-          </div>
+          <Input
+            value={displayName}
+            onChange={(e) => onDocumentNameChange(e.target.value)}
+            className="max-w-md border-border/60 bg-card"
+            placeholder="Analysis name"
+            aria-label="Analysis name"
+          />
+          <p className="text-xs text-muted-foreground">Processed {formatDate(data.processedAt)}</p>
         </div>
+        {preferences.includeConfidence && totalAccuracy > 0 && (
+          <CircularProgress value={totalAccuracy} size={88} strokeWidth={7} />
+        )}
+      </div>
 
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-4">Structured Fields</h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              {Object.entries(data.fields).map(([key, value]) => {
+      {data.question && (
+        <Card className="gap-2 border-primary/20 bg-primary/5 py-4 hover:border-primary/35 hover:shadow-md">
+          <div className="px-6">
+            <p className="text-xs font-medium uppercase tracking-wider text-primary">Question</p>
+            <p className="mt-1 text-sm text-foreground">{data.question}</p>
+          </div>
+        </Card>
+      )}
+
+      {showNarrative && data.analysis && (
+        <Card className="gap-4 py-5 hover:border-primary/20 hover:shadow-md">
+          <div className="space-y-4 px-6">
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                Findings
+              </h3>
+              {data.analysis.summary && (
+                <p className="mt-2 text-base leading-relaxed text-foreground">{data.analysis.summary}</p>
+              )}
+            </div>
+
+            {data.analysis.findings?.length > 0 && (
+              <ul className="space-y-2">
+                {data.analysis.findings.map((finding, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-foreground/90">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                    {finding}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {data.analysis.methodology && (
+              <div className="rounded-lg bg-secondary/60 px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  How it was analyzed
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                  {data.analysis.methodology}
+                </p>
+              </div>
+            )}
+
+            {data.analysis.codeSketch && (
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Analysis sketch
+                </p>
+                <pre className="overflow-x-auto rounded-lg border border-border bg-[#0c1214] p-4 text-xs leading-relaxed text-emerald-200/90 font-mono">
+                  {data.analysis.codeSketch}
+                </pre>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {data.analysis?.charts && data.analysis.charts.length > 0 && preferences.chartPreference !== "none" && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {data.analysis.charts.map((chart, i) => (
+            <SimpleChart key={`${chart.title}-${i}`} chart={chart} />
+          ))}
+        </div>
+      )}
+
+      {showStructured && Object.keys(data.fields).length > 0 && (
+        <Card className="gap-4 py-5">
+          <div className="px-6">
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Structured fields
+            </h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              {Object.entries(data.fields)
+                .filter(([key]) => !key.startsWith("__"))
+                .map(([key, value]) => {
                 const confidence = data.confidence?.[key] || 0
                 return (
-                  <div key={key} className="p-4 rounded-lg bg-secondary border border-border">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-sm font-medium text-muted-foreground">{formatFieldName(key)}</div>
-                      <div className="flex flex-row w-40 items-center gap-4">
-                    <Progress value={confidence} className="h-1.5" />
-                      <div className="text-sm font-semibold text-foreground">{Math.round(confidence)}%</div>
+                  <div key={key} className="rounded-lg border border-border bg-secondary/40 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-secondary/60 hover:shadow-sm">
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <div className="text-xs font-medium text-muted-foreground">
+                        {formatFieldName(key)}
                       </div>
+                      {preferences.includeConfidence && (
+                        <div className="flex w-28 items-center gap-2">
+                          <Progress value={confidence} className="h-1" />
+                          <span className="text-xs tabular-nums text-muted-foreground">
+                            {Math.round(confidence)}%
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <div className="text-base text-foreground font-medium mb-2">{value}</div>
+                    <div className="text-sm font-medium text-foreground break-words">{String(value)}</div>
                   </div>
                 )
               })}
             </div>
           </div>
+        </Card>
+      )}
 
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-foreground">Raw Extracted Text</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCopyRawText}
-                className="gap-2 text-muted-foreground hover:text-foreground"
-              >
+      {data.rawText?.trim() && (
+        <Card className="gap-3 py-5">
+          <div className="px-6">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                Raw output
+              </h3>
+              <Button variant="ghost" size="sm" onClick={handleCopyRawText} className="gap-1.5 h-8">
                 {copied ? (
                   <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Copied!
+                    <Check className="h-3.5 w-3.5" /> Copied
                   </>
                 ) : (
                   <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                      />
-                    </svg>
-                    Copy
+                    <ClipboardCopy className="h-3.5 w-3.5" /> Copy
                   </>
                 )}
               </Button>
             </div>
-            <div className="p-4 rounded-lg bg-secondary border border-border">
-              {data.rawText && data.rawText.trim() ? (
-                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{data.rawText}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">No raw text available for this document</p>
-              )}
+            <div className="rounded-lg border border-border bg-secondary/40 p-4">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{data.rawText}</p>
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Export Options</h3>
-        <div className="flex flex-wrap gap-3">
-          <Button onClick={handleExportExcel} className="gap-2 cursor-pointer">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            Export as Excel
-          </Button>
-          <Button onClick={handleExportPDF} variant="outline" className="gap-2 bg-transparent cursor-pointer">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-              />
-            </svg>
-            Export as PDF
-          </Button>
+      <Card className="gap-3 py-5">
+        <div className="px-6">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Export
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={handleExportExcel} className="group gap-2 hover:-translate-y-0.5">
+              <FileSpreadsheet className="h-4 w-4" />
+              Excel
+            </Button>
+            <Button onClick={handleExportPDF} variant="outline" className="group gap-2 hover:-translate-y-0.5">
+              <FileDown className="h-4 w-4 transition-transform group-hover:translate-y-0.5" />
+              PDF
+            </Button>
+          </div>
         </div>
       </Card>
     </div>
